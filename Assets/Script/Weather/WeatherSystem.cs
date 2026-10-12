@@ -165,6 +165,13 @@ namespace Game.Weather
 
         public WeatherType CurrentWeather => currentWeather;
         public WeatherType PreviousWeather => previousWeather;
+
+        /// <summary>
+        /// 新分层雨系统（RainWeatherFX）接管降雨时置为 false：
+        /// 关闭本系统内置的远/近/中雨丝与水花，避免双重降雨。雪/雾/风表现不受影响。
+        /// </summary>
+        public bool BuiltInRainEnabled { get; set; } = true;
+
         public bool IsWeatherVisible => presentationVisible;
         public float TransitionProgress => Mathf.Clamp01(transitionElapsed / Mathf.Max(0.1f, transitionSeconds));
         public float CurrentRainStrength => activeProfile.rain;
@@ -935,14 +942,16 @@ namespace Game.Weather
             float windPulse = Mathf.Lerp(0.7f, 1.22f, Mathf.PerlinNoise(Time.time * 0.23f, 3.17f));
             // 暴雨加成：雷暴的雨量要肉眼可见地大于小雨，不只是更暗。
             float stormBoost = 1f + activeProfile.lightning * 0.9f;
-            farRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * farRainParticlesPerSecond;
-            nearRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * nearRainParticlesPerSecond;
-            midRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * farRainParticlesPerSecond * 0.8f;
+            // 新分层雨系统（RainWeatherFX）接管时置 0，避免双重降雨。
+            float rainGate = BuiltInRainEnabled ? 1f : 0f;
+            farRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * rainGate * farRainParticlesPerSecond;
+            nearRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * rainGate * nearRainParticlesPerSecond;
+            midRainEmission.rateOverTime = activeProfile.rain * rainPulse * stormBoost * rainGate * farRainParticlesPerSecond * 0.8f;
             snowEmission.rateOverTime = activeProfile.snow * snowParticlesPerSecond;
             snowNearEmission.rateOverTime = activeProfile.snow * 14f;
             windEmission.rateOverTime = activeProfile.wind * windPulse * windParticlesPerSecond;
             leafEmission.rateOverTime = activeProfile.wind * windPulse * leafParticlesPerSecond;
-            splashEmission.rateOverTime = activeProfile.rain * activeProfile.rain * rainPulse * splashParticlesPerSecond;
+            splashEmission.rateOverTime = activeProfile.rain * activeProfile.rain * rainPulse * rainGate * splashParticlesPerSecond;
 
             ParticleSystem.MainModule farMain = farRainParticles.main;
             ParticleSystem.MainModule nearMain = nearRainParticles.main;
